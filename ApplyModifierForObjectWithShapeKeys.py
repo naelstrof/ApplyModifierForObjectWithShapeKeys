@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # The MIT License (MIT)
 #
-# Copyright (c) 2015 Przemysław Bągard
+# Copyright (c) 2019 Naelstrof
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -22,19 +22,13 @@
 # THE SOFTWARE.
 # ------------------------------------------------------------------------------
 
-# Date: 01 February 2015
-# Blender script
-# Description: Apply modifier and remove from the stack for object with shape keys
-# (Pushing 'Apply' button in 'Object modifiers' tab result in an error 'Modifier cannot be applied to a mesh with shape keys').
-
 bl_info = {
     "name":         "Apply modifier for object with shape keys",
-    "author":       "Przemysław Bągard",
-    "blender":      (2,6,6),
-    "version":      (0,1,0),
-    "location":     "Context menu",
-    "description":  "Apply modifier and remove from the stack for object with shape keys (Pushing 'Apply' button in 'Object modifiers' tab result in an error 'Modifier cannot be applied to a mesh with shape keys').",
-    "category":     "Object Tools > Multi Shape Keys"
+    "author":       "Przemysław Bągard and Naelstrof", # Przemysław Bągard made the original, Naelstrof updated it to 2.8
+    "blender":      (2,80,0),
+    "location":     "View3D",
+    "description":  "Applies modifiers even if the object has shape keys. Only works on modifiers that create consistent vertex counts and orders.",
+    "category":     "Generic"
 }
 
 import bpy, math
@@ -53,86 +47,77 @@ def applyModifierForObjectWithShapeKeys(context, modifierName):
     list_names = []
     list = []
     list_shapes = []
-    if context.object.data.shape_keys:
-        list_shapes = [o for o in context.object.data.shape_keys.key_blocks]
+    if context.active_object.data.shape_keys:
+        list_shapes = [o for o in context.active_object.data.shape_keys.key_blocks]
     
     if(list_shapes == []):
         bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifierName)
-        return context.scene.objects.active
+        return context.active_object
     
-    list.append(context.scene.objects.active)
+    list.append(context.active_object)
     for i in range(1, len(list_shapes)):
-        bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "constraint_orientation":'GLOBAL', "mirror":False, "proportional":'DISABLED', "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "texture_space":False, "release_confirm":False})
-        list.append(context.scene.objects.active)
+        bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "constraint_axis":(False, False, False), "mirror":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "snap":False, "snap_target":'CLOSEST', "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "texture_space":False, "release_confirm":False})
+        list.append(context.active_object)
 
     for i, o in enumerate(list):
-        context.scene.objects.active = o
+        override = bpy.context.copy()
+        override["active_object"] = o
+        override["object"] = o
+        override["selected_objects"] = [o]
+        
         list_names.append(o.data.shape_keys.key_blocks[i].name)
         for j in range(i+1, len(list))[::-1]:
-            context.object.active_shape_key_index = j
-            bpy.ops.object.shape_key_remove()
+            o.active_shape_key_index = j
+            bpy.ops.object.shape_key_remove(override)
         for j in range(0, i):
-            context.object.active_shape_key_index = 0
-            bpy.ops.object.shape_key_remove()
-        # last deleted shape doesn't change object shape
-        context.object.active_shape_key_index = 0
-        # for some reason, changing to edit mode and return object mode fix problem with mesh change when deleting last shapekey
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.object.editmode_toggle()
-        bpy.ops.object.shape_key_remove()
+            o.active_shape_key_index = 0
+            bpy.ops.object.shape_key_remove(override)
+        o.active_shape_key_index = 0
+        bpy.ops.object.shape_key_remove(override)
+        
         # time to apply modifiers
-        bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifierName)
+        bpy.ops.object.modifier_apply(override, apply_as='DATA', modifier=modifierName)
     
     bpy.ops.object.select_all(action='DESELECT')
-    context.scene.objects.active = list[0]
-    list[0].select = True
-    bpy.ops.object.shape_key_add(from_mix=False)
-    context.scene.objects.active.data.shape_keys.key_blocks[0].name = list_names[0]
-    for i in range(1, len(list)):
-        list[i].select = True
-        bpy.ops.object.join_shapes()
-        list[i].select = False
-        context.scene.objects.active.data.shape_keys.key_blocks[i].name = list_names[i]
+    for i in list:
+        i.select_set(True)
+    override = bpy.context.copy()
+    override["active_object"] = list[0]
+    override["selected_objects"] = list
+    
+    bpy.ops.object.join_shapes(override)
+    for i in range(0, len(list)):
+        list[0].data.shape_keys.key_blocks[i].name = list_names[i]
     
     bpy.ops.object.select_all(action='DESELECT')
-    for o in list[1:]:
-        o.select = True
+    override["selected_objects"] = list[1:]
+    override["active_object"] = None
+    override["object"] = None
+    bpy.ops.object.delete(override,use_global=False)
+    return context.active_object
 
-    bpy.ops.object.delete(use_global=False)
-    context.scene.objects.active = list[0]
-    context.scene.objects.active.select = True
-    return context.scene.objects.active
-
-class ApplyModifierForObjectWithShapeKeysOperator(bpy.types.Operator):
-    bl_idname = "object.apply_modifier_for_object_with_shape_keys"
+class AMWSK_OT_ApplyModifierWithShapeKeys(bpy.types.Operator):
     bl_label = "Apply modifier for object with shape keys"
+    bl_idname = "object.apply_modifier_for_object_with_shape_keys"
  
     def item_list(self, context):
-        return [(modifier.name, modifier.name, modifier.name) for modifier in bpy.context.scene.objects.active.modifiers]
+        return [(modifier.name, modifier.name, modifier.name) for modifier in bpy.context.active_object.modifiers]
  
     my_enum = EnumProperty(name="Modifier name",
         items = item_list)
  
     def execute(self, context):
-    
-        ob = context.scene.objects.active
-        bpy.ops.object.select_all(action='DESELECT')
-        context.scene.objects.active = ob
-        context.scene.objects.active.select = True
         applyModifierForObjectWithShapeKeys(context, self.my_enum)
-        
         return {'FINISHED'}
  
     def invoke(self, context, event):
         return context.window_manager.invoke_props_dialog(self)
-        
-bpy.utils.register_class(ApplyModifierForObjectWithShapeKeysOperator)
 
-
-class DialogPanel(bpy.types.Panel):
-    bl_label = "Multi Shape Keys"
+class AMWSK_PT_Panel(bpy.types.Panel):
+    bl_idname = "AMWSK_PT_Panel"
+    bl_label = "Modifier Tools"
     bl_space_type = "VIEW_3D"
-    bl_region_type = "TOOLS"
+    bl_region_type = "UI"
  
     def draw(self, context):
         self.layout.operator("object.apply_modifier_for_object_with_shape_keys")
@@ -141,12 +126,6 @@ class DialogPanel(bpy.types.Panel):
 def menu_func(self, context):
     self.layout.operator("object.apply_modifier_for_object_with_shape_keys", 
         text="Apply modifier for object with shape keys")
- 
-def register():
-   bpy.utils.register_module(__name__)
- 
-def unregister():
-    bpy.utils.unregister_module(__name__)
- 
-if __name__ == "__main__":
-    register()
+
+classes = (AMWSK_OT_ApplyModifierWithShapeKeys, AMWSK_PT_Panel)
+register, unregister = bpy.utils.register_classes_factory(classes)
