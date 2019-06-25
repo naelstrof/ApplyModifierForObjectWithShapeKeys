@@ -45,7 +45,7 @@ import time;
 # - Delete all duplicated object except one
 # - Delete old object
 # - Restore name of object and object data
-def applyModifiersForObjectWithShapeKeys(context, modifierName="", all=False, profile=False):
+def applyModifiersForObjectWithShapeKeys(context, operator, modifierName="", all=False, profile=False):
     firstTime = time.time()
     lastTime = time.time()
     if profile:
@@ -94,6 +94,7 @@ def applyModifiersForObjectWithShapeKeys(context, modifierName="", all=False, pr
             # there's a bug in convert that just applies all modifiers and shape keys.
             # It's much faster than removing shape keys and applying modifiers by about 10x (1000% faster)
             bpy.ops.object.convert()
+            o.select_set(False)
     else:
         for i, o in enumerate(list):
             o.select_set(True)
@@ -120,6 +121,7 @@ def applyModifiersForObjectWithShapeKeys(context, modifierName="", all=False, pr
             context.view_layer.objects.active = o
             # time to apply modifiers
             bpy.ops.object.modifier_apply(override, apply_as='DATA', modifier=modifierName)
+            o.select_set(False)
     
     if profile and not all:
         print("Modifier Application finished: " + str(time.time()-lastTime))
@@ -130,6 +132,8 @@ def applyModifiersForObjectWithShapeKeys(context, modifierName="", all=False, pr
         i.select_set(True)
     context.view_layer.objects.active = list[0]
     bpy.ops.object.join_shapes()
+    if (len(list[0].data.shape_keys.key_blocks) != len(list_names)):
+        operator.report({"WARNING"}, message="Some keys were lost due to differing vertex counts...")
     for i in range(0, len(list[0].data.shape_keys.key_blocks)):
         list[0].data.shape_keys.key_blocks[i].name = list_names[i]
         
@@ -162,7 +166,7 @@ class AMWSK_OT_ApplyAllModifiersForObjectWithShapeKeysOperator(bpy.types.Operato
     bl_label = "Apply all modifiers (Faster)"
     
     def execute(self, context):
-        applyModifiersForObjectWithShapeKeys(context, all=True)
+        applyModifiersForObjectWithShapeKeys(context, self, all=True)
         return {'FINISHED'}
     
 class AMWSK_OT_ApplyModifierForObjectWithShapeKeysOperator(bpy.types.Operator):
@@ -176,7 +180,7 @@ class AMWSK_OT_ApplyModifierForObjectWithShapeKeysOperator(bpy.types.Operator):
         items = item_list)
  
     def execute(self, context):
-        applyModifiersForObjectWithShapeKeys(context, self.my_enum)
+        applyModifiersForObjectWithShapeKeys(context, self, self.my_enum)
         return {'FINISHED'}
  
     def invoke(self, context, event):
