@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # The MIT License (MIT)
 #
-# Copyright (c) 2019 Naelstrof
+# Copyright (c) 2015 Przemysław Bągard
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,7 @@ bl_info = {
     "version":      (0,2,0),
     "location":     "Context menu",
     "description":  "Applies modifiers for objects with shape keys. Only works on modifiers that create consistent vertex counts.",
-    "category":     "Right Tool Menu > Modifier Tools"
+    "category":     "Tool Menu > Modifier Tools"
 }
 
 import bpy, math
