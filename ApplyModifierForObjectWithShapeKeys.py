@@ -71,7 +71,7 @@ def applyModifiersForObjectWithShapeKeys(context, operator, modifierName="", all
         if (all):
             bpy.ops.object.convert()
         else:
-            bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifierName)
+            bpy.ops.object.modifier_apply(modifier=modifierName)
         return context.active_object
     
     list.append(context.active_object)
@@ -120,7 +120,7 @@ def applyModifiersForObjectWithShapeKeys(context, operator, modifierName="", all
             o.select_set(True)
             context.view_layer.objects.active = o
             # time to apply modifiers
-            bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifierName)
+            bpy.ops.object.modifier_apply(modifier=modifierName)
             o.select_set(False)
     
     if profile and not all:
