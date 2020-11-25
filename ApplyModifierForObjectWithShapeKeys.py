@@ -26,7 +26,7 @@ bl_info = {
     "name":         "Apply modifier for object with shape keys",
     "author":       "Przemysław Bągard and Naelstrof",
     "blender":      (2,80,0),
-    "version":      (0,2,0),
+    "version":      (0,3,0),
     "location":     "Context menu",
     "description":  "Applies modifiers for objects with shape keys. Only works on modifiers that create consistent vertex counts.",
     "category":     "Tool Menu > Modifier Tools"
